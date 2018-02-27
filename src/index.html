@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/style.css">
+    <script type="text/javascript" src="//use.typekit.net/tor0zlh.js"></script>
+    <script type="text/javascript">try{Typekit.load();}catch(e){}</script>
+  <meta charset="utf-8">
+  <title>Emulador Ensamblador</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+</head>
+<body>
+  <nav class="navbar navbar-inverse bg-inverse">
+       <div class="container">
+           <div class="navbar-header navbar-center">
+               <a class="navbar-brand" style="color:#14D4FF">Emulador Ensamblador</a>
+           </div>
+           <div class="navbar-header navbar-right">
+               <a class="navbar-brand" style="color:#14D4FF">By Julio, Cesar y Cecil</a>
+           </div>
+       </div>
+</nav>
+<div class="container">
+<div class="row">
+<div class="col-lg-7 col-md-6">
+<div class="panel panel-default">
+<div class="panel-heading">
+    <h4 class="panel-title" >Crea tu Instruction Aqui</h4>
+</div>
+<div class="styled-select slate semi-square">
+  <select id="operations" onchange="operationsList()">
+    <option value="">-- Operacion --</option>
+    <option value="LDA">LDA</option>
+    <option value="STA">STA</option>
+    <option value="CLA">CLA</option>
+    <option value="ADD">ADD</option>
+    <option value="SUB">SUB</option>
+    <option value="NOP">NOP</option>
+    <option value="NEG">NEG</option>
+    <option value="HLT">HLT</option>
+  </select>
+</div>
+<div class="styled-select slate semi-square">
+    <select id="type-dir"></select>
+</div>
+<input type="text" id="data-ins" name="data" class="semi-square">
+<button type="button" class="button" onclick="getOperation()" id="Assam"><span>Assemble</span></button>
+</div>
+<div class="panel-body container slate">
+<p class="text-muted ">Registros / Banderas</p>
+<table class="table table-condensed table-striped">
+<thead>
+    <tr>
+        <th style="text-align:center">AC</th>
+        <th style="text-align:center">PC</th>
+        <th style="text-align:center">MDR</th>
+        <th style="text-align:center">MAR</th>
+        <th style="text-align:center">CFR</th>
+        <th style="text-align:center">IR</th>
+        <th style="text-align:center">SP</th>
+    </tr>
+</thead>
+<tbody>
+    <tr style="text-align:center;" class="source-code">
+        <td><div style="margin:auto;" id="ac"><small></small></div></td>
+        <td><div style="margin:auto;"  id="pc"><small></small></div></td>
+        <td><div style="margin:auto;" id="MDR"><small></small></div></td>
+        <td><div style="margin:auto;" id="MAR"><small></small></div></td>
+        <td><div style="margin:auto;" class="marker marker-ip"id="CFR"><small></small></div></td>
+        <td><div style="margin:auto;" class="marker marker-sp"id="IR"><small></small></div></td>
+        <td><div style="margin:auto;" class="marker marker-sp"id="SP"><small></small></div></td>
+    </tr>
+  </tbody>
+</div>
+<div style="width:500px;height:270px;border:3px solid #000; background-color: white;" id="Consola-Field">
+  <h4>Consola</h4>
+</div>
+  <app-root></app-root>
+  <button class="button" style="vertical-align:middle" onclick="reset()"><span>Reset</span></button>
+</body>
+</html>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script>
+var tDir = {};
+tDir['LDA'] = ['ABSOLUTO', 'INMEDIATO', 'INDIRECTO','RELATIVO'];
+tDir['STA'] = ['ABSOLUTO', 'INMEDIATO', 'INDIRECTO','RELATIVO'];
+tDir['CLA'] = [''];
+tDir['ADD'] = ['ABSOLUTO', 'INMEDIATO', 'INDIRECTO','RELATIVO'];
+tDir['SUB'] = ['ABSOLUTO', 'INMEDIATO', 'INDIRECTO','RELATIVO'];
+tDir['NOP'] = [''];
+tDir['NEG'] = ['ABSOLUTO', 'INMEDIATO', 'INDIRECTO','RELATIVO'];
+tDir['HLT'] = [''];
+var AC;
+var PC = 0;
+var MDR;
+var MAR;
+var CFR;
+var IR;
+
+var MEM = new Array(800).fill(0);
+
+var INS = new Array(200).fill(0);;
+
+
+function operationsList() {
+    var op = document.getElementById("operations");
+    var direcs = document.getElementById("type-dir");
+    var instruction = op.options[op.selectedIndex].value;
+    while (direcs.options.length) {
+        direcs.remove(0);
+    }
+    var microOps = tDir[instruction];
+    if (microOps) {
+        var i;
+        for (i = 0; i < microOps.length; i++) {
+            var  microOp = new Option(microOps[i], i);
+            direcs.options.add(microOp);
+        }
+    }
+}
+function getOperation() {
+  var opElemnt = document.getElementById("operations");
+  var dirElemnt = document.getElementById("type-dir");
+  var dataElemnt = document.getElementById("data-ins");
+  var operation = opElemnt.options[opElemnt.selectedIndex].value;
+  var direccion = dirElemnt.options[dirElemnt.selectedIndex].value;
+  var data = dataElemnt.value;
+  run(operation,direccion,data);
+}
+
+function run(ope, direc, dato) {
+  DATA = parseInt(dato);
+  PC += 1;
+  document.getElementById("pc").innerHTML = PC;
+  $('p').remove();
+  if (direc == 0) {
+    direc = 'ABSOLUTO';
+  }
+  else if (direc == 1) {
+    direc = 'INMEDIATO';
+  }
+  else if (direc == 2) {
+    direc = 'INDIRECTO';
+  }
+  else if (direc == 3) {
+    direc = 'RELATIVO';
+  }
+   switch (ope) {
+     case 'LDA':
+      if(direc == 'ABSOLUTO'){
+        MAR = DATA;
+        MDR = MEM[MAR];
+        AC = MDR;
+      $('<p>MAR -> IR[0,2]</p>').appendTo('#Consola-Field');
+      document.getElementById("MAR").innerHTML = MAR;
+      setTimeout(function() {
+        $('<p>MMREAD</p>').appendTo('#Consola-Field');
+        document.getElementById("MDR").innerHTML = MDR;
+      }, 3000);
+      setTimeout(function() {
+        $('<p>AC -> MDR</p>').appendTo('#Consola-Field');
+        document.getElementById("ac").innerHTML = AC;
+      }, 5000);
+      setTimeout(function() {
+        $('<p>Done..</p>').appendTo('#Consola-Field');
+      }, 5100);
+      }
+      else if (direc == 'INMEDIATO') {
+        $('<p>AC -> IR[0,2]</p>').appendTo('#Consola-Field');
+        AC = DATA;
+        document.getElementById("ac").innerHTML = AC;
+        setTimeout(function() {
+          $('<p>Done..</p>').appendTo('#Consola-Field');
+        }, 1000);
+      }
+      else if (direc == 'INDIRECTO') {
+        MAR = MEM[DATA];
+        MDR = MEM[MAR];
+        AC = MDR;
+        $('<p>MAR -> IR[0,2]</p>').appendTo('#Consola-Field');
+        document.getElementById("MAR").innerHTML = MAR;
+        setTimeout(function() {
+          $('<p>MMREAD</p>').appendTo('#Consola-Field');
+        }, 2000);
+        setTimeout(function() {
+          $('<p>MAR -> MDR</p>').appendTo('#Consola-Field');
+          document.getElementById("MDR").innerHTML = MDR;
+        }, 3000);
+        setTimeout(function() {
+          $('<p>MMREAD</p>').appendTo('#Consola-Field');
+        }, 4000);
+        setTimeout(function() {
+          $('<p>AC -> MDR</p>').appendTo('#Consola-Field');
+          document.getElementById("ac").innerHTML = AC;
+        }, 5000);
+        setTimeout(function() {
+          $('<p>Done..</p>').appendTo('#Consola-Field');
+        }, 5100);
+      }
+      else if (direc == 'RELATIVO') {
+        MAR =  DATA + PC;
+        MDR = MAR;
+        AC = MAR;
+        $('<p>MAR -> IR[0,2] + PC</p>').appendTo('#Consola-Field');
+        document.getElementById("MAR").innerHTML = MAR;
+        setTimeout(function() {
+          $('<p>MMREAD</p>').appendTo('#Consola-Field');
+          document.getElementById("MDR").innerHTML = MDR;
+        }, 2000);
+        setTimeout(function() {
+          $('<p>AC -> MDR</p>').appendTo('#Consola-Field');
+          document.getElementById("ac").innerHTML = AC;
+        }, 3000);
+        setTimeout(function() {
+          $('<p>Done..</p>').appendTo('#Consola-Field');
+        }, 3100);
+      }
+      if(AC == 0){
+        CFR = 'Z';
+        document.getElementById("CFR").innerHTML = CFR;
+      }else {
+        CFR = 0;
+      }
+      document.getElementById("CFR").innerHTML = CFR;
+       break;
+     case 'STA':
+     if(direc == 'ABSOLUTO'){
+      MAR = DATA;
+      MDR = AC;
+      MEM [MAR] = MDR;
+     $('<p>MAR -> IR[0,2]</p>').appendTo('#Consola-Field');
+     document.getElementById("MAR").innerHTML = MAR;
+     setTimeout(function() {
+       $('<p>MDR -> AC</p>').appendTo('#Consola-Field');
+       document.getElementById("MDR").innerHTML = MDR;
+     }, 1000);
+     setTimeout(function() {
+       $('<p>MMWRITE</p>').appendTo('#Consola-Field');
+     }, 2000);
+     setTimeout(function() {
+       $('<p>Done..</p>').appendTo('#Consola-Field');
+     }, 2100);
+     }
+     else if (direc == 'INMEDIATO') {
+       $('<p>Error, no es posible !!!</p>').appendTo('#Consola-Field');
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 1000);
+     }
+     else if (direc == 'INDIRECTO') {
+       MAR = MEM[DATA];
+       MDR = MEM[MAR];
+       MAR = MDR;
+       AC = MEM[MAR];
+       $('<p>MAR -> IR[0,2]</p>').appendTo('#Consola-Field');
+       document.getElementById("MAR").innerHTML = MAR;
+       setTimeout(function() {
+         $('<p>MMREAD</p>').appendTo('#Consola-Field');
+       }, 2000);
+       setTimeout(function() {
+         $('<p>MAR -> MDR</p>').appendTo('#Consola-Field');
+         document.getElementById("MDR").innerHTML = MDR;
+       }, 3000);
+       setTimeout(function() {
+         $('<p>MDR -> AC</p>').appendTo('#Consola-Field');
+         document.getElementById("MAR").innerHTML = MAR;
+       }, 4000);
+       setTimeout(function() {
+         $('<p>MMWRITE</p>').appendTo('#Consola-Field');
+         document.getElementById("ac").innerHTML = AC;
+       }, 5000);
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 5100);
+     }
+     else if (direc == 'RELATIVO') {
+       MAR = DATA + PC;
+       MDR = MAR;
+       AC = MAR;
+       $('<p>MAR -> IR[0,2] + PC</p>').appendTo('#Consola-Field');
+       document.getElementById("MAR").innerHTML = MAR;
+       setTimeout(function() {
+         $('<p>MDR -> AC</p>').appendTo('#Consola-Field');
+         document.getElementById("MDR").innerHTML = MDR;
+       }, 1000);
+       setTimeout(function() {
+         $('<p>MMWRITE</p>').appendTo('#Consola-Field');
+         document.getElementById("ac").innerHTML = AC;
+       }, 2000);
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 2100);
+     }
+     if(AC > 999999){
+       CFR = 'V';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else if (AC == 0) {
+       CFR = 'Z';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else if (AC < 0) {
+       CFR = 'N';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else{
+       CFR = 0;
+     }
+     document.getElementById("CFR").innerHTML = CFR;
+       break;
+     case 'CLA':
+     $('<p> AC -> +00000</p>').appendTo('#Consola-Field');
+     AC = 00;
+     document.getElementById("ac").innerHTML = AC;
+     setTimeout(function() {
+       $('<p>Done..</p>').appendTo('#Consola-Field');
+     }, 1000);
+       break;
+     case 'ADD':
+     if(direc == 'ABSOLUTO'){
+       MAR = DATA;
+       MDR = MEM[MAR];
+       AC += MDR;
+     $('<p>MAR -> IR[0,2]</p>').appendTo('#Consola-Field');
+     document.getElementById("MAR").innerHTML = MAR;
+     setTimeout(function() {
+       $('<p>MMREAD</p>').appendTo('#Consola-Field');
+       document.getElementById("MDR").innerHTML = MDR;
+     }, 1000);
+     setTimeout(function() {
+       $('<p>AC -> AC + MDR</p>').appendTo('#Consola-Field');
+       document.getElementById("ac").innerHTML = AC;
+     }, 2000);
+     setTimeout(function() {
+       $('<p>Done..</p>').appendTo('#Consola-Field');
+     }, 2100);
+     }
+     else if (direc == 'INMEDIATO') {
+       AC += DATA;
+       $('<p>AC -> IR[2,0] + AC</p>').appendTo('#Consola-Field');
+       document.getElementById("ac").innerHTML = AC;
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 1000);
+     }
+     else if (direc == 'INDIRECTO') {
+       MAR = MEM[DATA];
+       MDR = MEM[MAR];
+       AC = MDR;
+       $('<p>MAR -> IR[0,2]</p>').appendTo('#Consola-Field');
+       document.getElementById("MAR").innerHTML = MAR;
+       setTimeout(function() {
+         $('<p>MMREAD</p>').appendTo('#Consola-Field');
+       }, 2000);
+       setTimeout(function() {
+         $('<p>MAR -> MDR</p>').appendTo('#Consola-Field');
+       }, 3000);
+       setTimeout(function() {
+         $('<p>MMREAD</p>').appendTo('#Consola-Field');
+         document.getElementById("MDR").innerHTML = MDR;
+       }, 4000);
+       setTimeout(function() {
+         $('<p>AC -> MDR + AC</p>').appendTo('#Consola-Field');
+         document.getElementById("ac").innerHTML = AC;
+       }, 5000);
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 5100);
+     }
+     else if (direc == 'RELATIVO') {
+       MAR = DATA + PC;
+       MDR = MAR;
+       AC += MAR;
+       $('<p>MAR -> IR[0,2] + PC</p>').appendTo('#Consola-Field');
+       document.getElementById("MAR").innerHTML = MAR;
+       setTimeout(function() {
+         $('<p>MMREAD</p>').appendTo('#Consola-Field');
+         document.getElementById("MDR").innerHTML = MDR;
+       }, 1000);
+       setTimeout(function() {
+         $('<p>AC -> MDR + AC</p>').appendTo('#Consola-Field');
+         document.getElementById("ac").innerHTML = AC;
+       }, 2000);
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 2100);
+     }
+     if (AC > 999999) {
+       CFR = 'V';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else if (AC == 0) {
+       CFR = 'Z';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else if (AC < 0) {
+       CFR = 'N';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else{
+       CFR = 0;
+     }
+     document.getElementById("CFR").innerHTML = CFR;
+       break;
+     case 'SUB':
+     AC = 0;
+     if(direc == 'ABSOLUTO'){
+       MAR = DATA;
+       MDR = MEM[MAR];
+       AC = AC - MDR;
+     $('<p>MAR -> IR[0,2]</p>').appendTo('#Consola-Field');
+      document.getElementById("MAR").innerHTML = MAR;
+     setTimeout(function() {
+       $('<p>MMREAD</p>').appendTo('#Consola-Field');
+        document.getElementById("MDR").innerHTML = MDR;
+     }, 1000);
+     setTimeout(function() {
+       $('<p>AC -> AC - MDR</p>').appendTo('#Consola-Field');
+        document.getElementById("ac").innerHTML = AC;
+     }, 2000);
+     setTimeout(function() {
+       $('<p>Done..</p>').appendTo('#Consola-Field');
+     }, 2100);
+     }
+     else if (direc == 'INMEDIATO') {
+       AC = AC - DATA;
+       $('<p>AC -> IR[2,0] - AC</p>').appendTo('#Consola-Field');
+        document.getElementById("ac").innerHTML = AC;
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 1000);
+     }
+     else if (direc == 'INDIRECTO') {
+       MAR = MEM[DATA];
+       MDR = MEM[MAR];
+       AC -= MDR;
+       $('<p>MAR -> IR[0,2]</p>').appendTo('#Consola-Field');
+         document.getElementById("MAR").innerHTML = MAR;
+       setTimeout(function() {
+         $('<p>MMREAD</p>').appendTo('#Consola-Field');
+           document.getElementById("MDR").innerHTML = MDR;
+       }, 2000);
+       setTimeout(function() {
+         $('<p>MAR -> MDR</p>').appendTo('#Consola-Field');
+       }, 3000);
+       setTimeout(function() {
+         $('<p>MMREAD</p>').appendTo('#Consola-Field');
+       }, 4000);
+       setTimeout(function() {
+         $('<p>AC -> MDR - AC</p>').appendTo('#Consola-Field');
+           document.getElementById("ac").innerHTML = AC;
+       }, 5000);
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 5100);
+     }
+     else if (direc == 'RELATIVO') {
+       MAR = DATA + PC;
+       MDR = MAR;
+       AC -= MAR;
+       $('<p>MAR -> IR[0,2] + PC</p>').appendTo('#Consola-Field');
+       document.getElementById("MAR").innerHTML = MAR;
+       setTimeout(function() {
+         $('<p>MMREAD</p>').appendTo('#Consola-Field');
+         document.getElementById("MDR").innerHTML = MDR;
+       }, 1000);
+       setTimeout(function() {
+         $('<p>AC -> MDR - AC</p>').appendTo('#Consola-Field');
+         document.getElementById("ac").innerHTML = AC;
+       }, 2000);
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 2100);
+     }
+     if (AC > 999999) {
+       CFR = 'V';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else if (AC == 0) {
+       CFR = 'Z';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else if (AC < 0) {
+       CFR = 'N';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else{
+       CFR = 0;
+     }
+     document.getElementById("CFR").innerHTML = CFR;
+       break;
+     case 'NOP':
+     $('<p>NO OPERACION</p>').appendTo('#Consola-Field');
+     setTimeout(function() {
+       $('<p>Done..</p>').appendTo('#Consola-Field');
+     }, 1100);
+       break;
+     case 'NEG':
+     if(direc == 'ABSOLUTO'){
+       MAR = DATA;
+       MDR = MEM[MAR];
+       AC = MDR;
+     $('<p>MAR -> IR[0,2]</p>').appendTo('#Consola-Field');
+     document.getElementById("MAR").innerHTML = MAR;
+     setTimeout(function() {
+       $('<p>MMREAD</p>').appendTo('#Consola-Field');
+       document.getElementById("MDR").innerHTML = MDR;
+     }, 1000);
+     setTimeout(function() {
+       $('<p>AC -> MDR</p>').appendTo('#Consola-Field');
+       document.getElementById("ac").innerHTML = AC;
+        AC *= -1;
+     }, 2000);
+     setTimeout(function() {
+       $('<p>AC *</p>').appendTo('#Consola-Field');
+       document.getElementById("ac").innerHTML = AC;
+     }, 3000);
+     setTimeout(function() {
+       $('<p>Done..</p>').appendTo('#Consola-Field');
+     }, 3100);
+     }
+     else if (direc == 'INMEDIATO') {
+       AC = DATA;
+       $('<p>AC -> IR[2,0]</p>').appendTo('#Consola-Field');
+       document.getElementById("ac").innerHTML = AC;
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+         AC *= -1;
+         document.getElementById("ac").innerHTML = AC;
+       }, 1000);
+     }
+     else if (direc == 'INDIRECTO') {
+       MAR = MEM[DATA];
+       MDR = MEM[MAR];
+       AC = MDR;
+       AC *= -1;
+       $('<p>MAR -> IR[0,2]</p>').appendTo('#Consola-Field');
+       document.getElementById("MAR").innerHTML = MAR;
+       setTimeout(function() {
+         $('<p>MMREAD</p>').appendTo('#Consola-Field');
+       }, 2000);
+       setTimeout(function() {
+         $('<p>MAR -> MDR</p>').appendTo('#Consola-Field');
+       }, 3000);
+       setTimeout(function() {
+         $('<p>MMREAD</p>').appendTo('#Consola-Field');
+         document.getElementById("MDR").innerHTML = MDR;
+       }, 4000);
+       setTimeout(function() {
+         AC *= -1;
+         $('<p>AC -> MDR + AC</p>').appendTo('#Consola-Field');
+         document.getElementById("ac").innerHTML = AC;
+       }, 5000);
+       setTimeout(function() {
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 5100);
+     }
+     else if (direc == 'RELATIVO') {
+       MAR = DATA + PC;
+       MDR = MAR;
+       AC = MAR;
+       $('<p>MAR -> IR[0,2] + PC</p>').appendTo('#Consola-Field');
+       document.getElementById("MAR").innerHTML = MAR;
+       setTimeout(function() {
+         $('<p>MMREAD</p>').appendTo('#Consola-Field');
+         document.getElementById("MDR").innerHTML = MDR;
+       }, 1000);
+       setTimeout(function() {
+         $('<p>AC -> MDR + AC</p>').appendTo('#Consola-Field');
+         document.getElementById("ac").innerHTML = AC;
+         AC *= -1;
+       }, 2000);
+       setTimeout(function() {
+         document.getElementById("ac").innerHTML = AC;
+         $('<p>Done..</p>').appendTo('#Consola-Field');
+       }, 2100);
+     }
+     if (AC > 999999) {
+       CFR = 'V';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else if (AC == 0) {
+       CFR = 'Z';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else if (AC < 0) {
+       CFR = 'N';
+       document.getElementById("CFR").innerHTML = CFR;
+     }else{
+       CFR = 0;
+     }
+     document.getElementById("CFR").innerHTML = CFR;
+       break;
+     case 'HTL':
+     $('<p>EXIT</p>').appendTo('#Consola-Field');
+     document.getElementById("ac").innerHTML = AC;
+     document.getElementById("MDR").innerHTML = MDR;
+     document.getElementById("MAR").innerHTML = MAR;
+     document.getElementById("pc").innerHTML = PC;
+       break;
+
+     default:
+     console.log('ERROR');
+   }
+};
+function reset() {
+   AC = 0;
+   PC = 0;
+   MDR = 0;
+   MAR = 0;
+   CFR = 0;
+   IR = 0;
+   document.getElementById("ac").innerHTML = AC;
+   document.getElementById("MDR").innerHTML = MDR;
+   document.getElementById("MAR").innerHTML = MAR;
+   document.getElementById("pc").innerHTML = PC;
+   document.getElementById("CFR").innerHTML = CFR;
+
+
+};
+</script>
